@@ -22,7 +22,7 @@ router.get('/:id/peliculas', async (req, res, next) => {
         const peliculas = await query(`
             SELECT DISTINCT p.id ,titulo,poster
             from pelicula p
-            JOIN actor_pelicula ap
+            JOIN actor_pelicula ap 
             ON p.id = ap.pelicula_id
             JOIN director_pelicula dp
             ON p.id = dp.pelicula_id
@@ -30,7 +30,7 @@ router.get('/:id/peliculas', async (req, res, next) => {
             AND ap.actor_id = COALESCE(?, ap.actor_id)
             AND dp.director_id = COALESCE(?,dp.director_id)
             ORDER BY RAND()
-            LIMIT 2 `, [competencia.genero_id, competencia.actor_id,competencia.director_id])
+            LIMIT 2 `, [competencia.genero_id, competencia.actor_id, competencia.director_id])
 
         res.send({
             competencia: competencia.titulo,
@@ -41,22 +41,22 @@ router.get('/:id/peliculas', async (req, res, next) => {
     }
 })
 
-router.put('/:id',(req,res,next)=>{
-query('UPDATE competencias SET titulo = ? WHERE id = ?', [req.body.nombre, req.params.id])
-.then(()=>{
-    res.sendStatus(204)
+router.put('/:id', (req, res, next) => {
+    query('UPDATE competencias SET titulo = ? WHERE id = ?', [req.body.nombre, req.params.id])
+        .then(() => {
+            res.sendStatus(204)
+        })
+        .catch(next)
 })
-.catch(next)
-})
 
 
 
-router.delete('/:id',(req,res,next)=>{
+router.delete('/:id', (req, res, next) => {
     query('UPDATE competencias SET eliminada = true WHERE id = ?', req.params.id)
-    .then(() => {
-        res.sendStatus(204);
-    })
-    .catch(next);
+        .then(() => {
+            res.sendStatus(204);
+        })
+        .catch(next);
 })
 
 
@@ -94,8 +94,8 @@ router.get('/:id/resultados', (req, res, next) => {
         JOIN pelicula p ON v.pelicula_id = p.id
         WHERE v.competencia_id = ?
         AND eliminado != true
-        GROUP BY v.pelicula_id 
-        ORDER BY votos DESC 
+        GROUP BY v.pelicula_id
+        ORDER BY votos DESC
         LIMIT 3`, req.params.id)
     ]).then(([[competencia], peliculas]) => {
         if (!competencia) {
@@ -111,17 +111,36 @@ router.get('/:id/resultados', (req, res, next) => {
 })
 
 
-// ME FALTA AGREGAR LA VALIDACION PARA QUE POR LO MENOS DOS PELICULAS CUMPLAN CON LOS REQUISISTOS DE LA COMPETENCIA CREADA. 
-router.post('/', (req, res, next) => {
-    const generoId = req.body.genero === "0" ? null : req.body.genero;
-    const directorId = req.body.director === "0" ? null : req.body.director;
-    const actorId = req.body.actor === "0" ? null : req.body.actor;
-    console.log(req.body.nombre, generoId, directorId, actorId)
-    query('INSERT INTO competencias(titulo, genero_id, director_id, actor_id) values(?, ?, ?, ?)', [req.body.nombre, generoId, directorId, actorId])
-        .then(() => {
+// ME FALTA AGREGAR LA VALIDACION PARA QUE POR LO MENOS DOS PELICULAS CUMPLAN CON LOS REQUISISTOS DE LA COMPETENCIA CREADA.
+router.post('/', async (req, res, next) => {
+    try {
+        const generoId = req.body.genero === "0" ? null : req.body.genero;
+        const directorId = req.body.director === "0" ? null : req.body.director;
+        const actorId = req.body.actor === "0" ? null : req.body.actor;
+        // console.log(req.body.nombre, generoId, directorId, actorId);
+
+        const validar = await query(`SELECT COUNT(*) AS contador
+        from pelicula p
+            JOIN actor_pelicula ap 
+            ON p.id = ap.pelicula_id
+            JOIN director_pelicula dp
+            ON p.id = dp.pelicula_id
+            WHERE genero_id = COALESCE(?, genero_id)
+            AND ap.actor_id = COALESCE(?, ap.actor_id)
+            AND dp.director_id = COALESCE(?,dp.director_id) `,[ generoId, actorId, directorId])
+        if(validar[0].contador < 2) {
+           res.sendStatus(404)
+            return
+            }
+
+        query('INSERT INTO competencias(titulo, genero_id, director_id, actor_id) values(?, ?, ?, ?)', [req.body.nombre, generoId, directorId, actorId])
+             .then (() => {
             res.sendStatus(201);
-        })
+         })
         .catch(next)
+    } catch(e){
+        next(e)
+    }
 })
 
 
